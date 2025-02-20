@@ -53,13 +53,12 @@ lazy_static::lazy_static! {
     static ref CONFIG: RwLock<Config> = RwLock::new(Config::load());
     static ref CONFIG2: RwLock<Config2> = RwLock::new(Config2::load());
     static ref LOCAL_CONFIG: RwLock<LocalConfig> = RwLock::new(LocalConfig::load());
-    static ref STATUS: RwLock<Status> = RwLock::new(Status::load());
     static ref TRUSTED_DEVICES: RwLock<(Vec<TrustedDevice>, bool)> = Default::default();
     static ref ONLINE: Mutex<HashMap<String, i64>> = Default::default();
     pub static ref PROD_RENDEZVOUS_SERVER: RwLock<String> = RwLock::new(match option_env!("RENDEZVOUS_SERVER") {
-     Some(key) if !key.is_empty() => key,
-     _ => "",
-    }.to_owned())
+        Some(key) if !key.is_empty() => key,
+        _ => "",
+    }.to_owned());
     pub static ref EXE_RENDEZVOUS_SERVER: RwLock<String> = Default::default();
     pub static ref APP_NAME: RwLock<String> = RwLock::new("RustDesk".to_owned());
     static ref KEY_PAIR: Mutex<Option<KeyPair>> = Default::default();
@@ -1975,16 +1974,6 @@ pub struct GroupUser {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct DeviceGroup {
-    #[serde(
-        default,
-        deserialize_with = "deserialize_string",
-        skip_serializing_if = "String::is_empty"
-    )]
-    pub name: String,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct Group {
     #[serde(
         default,
@@ -1996,8 +1985,6 @@ pub struct Group {
     pub users: Vec<GroupUser>,
     #[serde(default, deserialize_with = "deserialize_vec_grouppeer")]
     pub peers: Vec<GroupPeer>,
-    #[serde(default, deserialize_with = "deserialize_vec_devicegroup")]
-    pub device_groups: Vec<DeviceGroup>,
 }
 
 impl Group {
@@ -2069,7 +2056,6 @@ deserialize_default!(deserialize_vec_abpeer, Vec<AbPeer>);
 deserialize_default!(deserialize_vec_abentry, Vec<AbEntry>);
 deserialize_default!(deserialize_vec_groupuser, Vec<GroupUser>);
 deserialize_default!(deserialize_vec_grouppeer, Vec<GroupPeer>);
-deserialize_default!(deserialize_vec_devicegroup, Vec<DeviceGroup>);
 deserialize_default!(deserialize_keypair, KeyPair);
 deserialize_default!(deserialize_size, Size);
 deserialize_default!(deserialize_hashmap_string_string, HashMap<String, String>);
@@ -2257,7 +2243,6 @@ pub mod keys {
     // buildin options
     pub const OPTION_DISPLAY_NAME: &str = "display-name";
     pub const OPTION_DISABLE_UDP: &str = "disable-udp";
-    pub const OPTION_PRESET_DEVICE_GROUP_NAME: &str = "preset-device-group-name";
     pub const OPTION_PRESET_USERNAME: &str = "preset-user-name";
     pub const OPTION_PRESET_STRATEGY_NAME: &str = "preset-strategy-name";
     pub const OPTION_REMOVE_PRESET_PASSWORD_WARNING: &str = "remove-preset-password-warning";
@@ -2408,7 +2393,6 @@ pub mod keys {
     pub const KEYS_BUILDIN_SETTINGS: &[&str] = &[
         OPTION_DISPLAY_NAME,
         OPTION_DISABLE_UDP,
-        OPTION_PRESET_DEVICE_GROUP_NAME,
         OPTION_PRESET_USERNAME,
         OPTION_PRESET_STRATEGY_NAME,
         OPTION_REMOVE_PRESET_PASSWORD_WARNING,
@@ -2436,42 +2420,6 @@ pub fn common_load<
 
 pub fn common_store<T: serde::Serialize>(config: &T, suffix: &str) {
     Config::store_(config, suffix);
-}
-
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct Status {
-    #[serde(default, deserialize_with = "deserialize_hashmap_string_string")]
-    values: HashMap<String, String>,
-}
-
-impl Status {
-    fn load() -> Status {
-        Config::load_::<Status>("_status")
-    }
-
-    fn store(&self) {
-        Config::store_(self, "_status");
-    }
-
-    pub fn get(k: &str) -> String {
-        STATUS
-            .read()
-            .unwrap()
-            .values
-            .get(k)
-            .cloned()
-            .unwrap_or_default()
-    }
-
-    pub fn set(k: &str, v: String) {
-        if Self::get(k) == v {
-            return;
-        }
-
-        let mut st = STATUS.write().unwrap();
-        st.values.insert(k.to_owned(), v);
-        st.store();
-    }
 }
 
 #[cfg(test)]
